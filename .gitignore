@@ -1,0 +1,7 @@
+.env
+outputs/
+temp/
+
+__pycache__/
+pipeline/__pycache__/
+autodub/__pycache__/
