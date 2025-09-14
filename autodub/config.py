@@ -16,5 +16,5 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 TEMP_DIR.mkdir(exist_ok=True)
 
 DEFAULT_TARGET_LANGUAGE = "es"
-DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"  # Rachel voice
+DEFAULT_VOICE_ID = "pNInz6obpgDQGcFmaJgB"  # Adam voice (male)
 ELEVENLABS_BASE_URL = "https://api.elevenlabs.io/v1"
