@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoDub - AI Video Dubbing</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 60px 20px;
+            background: #fbfff1;
+            color: #3c3744;
+            min-height: 100vh;
+        }
+        
+        h1 {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 8px;
+            color: #3066be;
+            font-weight: 700;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #b4c5e4;
+            margin-bottom: 48px;
+            font-size: 1rem;
+        }
+        
+        .input-group {
+            margin-bottom: 24px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #3c3744;
+        }
+        
+        input[type="url"], select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #b4c5e4;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.2s;
+            box-sizing: border-box;
+            background: white;
+        }
+        
+        input[type="url"]:focus, select:focus {
+            outline: none;
+            border-color: #3066be;
+            box-shadow: 0 0 0 3px rgba(48, 102, 190, 0.1);
+        }
+        
+        .options {
+            margin: 24px 0;
+        }
+        
+        .option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+        
+        input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #3066be;
+        }
+        
+        .dub-button {
+            width: 100%;
+            background: #090c9b;
+            color: white;
+            border: none;
+            padding: 16px 32px;
+            font-size: 18px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .dub-button:hover:not(:disabled) {
+            background: #3066be;
+        }
+        
+        .dub-button:disabled {
+            background: #b4c5e4;
+            cursor: not-allowed;
+        }
+        
+        .result {
+            margin: 40px 0;
+            display: none;
+        }
+        
+        .result video {
+            width: 100%;
+            border-radius: 12px;
+            border: 2px solid #b4c5e4;
+            background: white;
+        }
+        
+        .download-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 16px;
+            width: 40px;
+            height: 40px;
+            background: #3066be;
+            color: white;
+            text-decoration: none;
+            border-radius: 50%;
+            transition: background-color 0.2s;
+        }
+        
+        .download-link:hover {
+            background: #090c9b;
+        }
+        
+        .download-icon {
+            width: 20px;
+            height: 20px;
+        }
+        
+        .error {
+            margin: 32px 0;
+            padding: 16px;
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            color: #dc2626;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>AutoDub</h1>
+    <p class="subtitle">AI-powered video dubbing with voice cloning</p>
+    
+    <form id="dubForm">
+        <div class="input-group">
+            <label for="youtubeUrl">YouTube URL</label>
+            <input 
+                type="url" 
+                id="youtubeUrl" 
+                placeholder="Paste YouTube URL here..." 
+                required
+            />
+        </div>
+        
+        <div class="input-group">
+            <label for="language">Target Language</label>
+            <select id="language">
+                <option value="es">🇪🇸 Spanish</option>
+                <option value="fr">🇫🇷 French</option>
+                <option value="de">🇩🇪 German</option>
+                <option value="it">🇮🇹 Italian</option>
+                <option value="pt">🇵🇹 Portuguese</option>
+                <option value="ru">🇷🇺 Russian</option>
+                <option value="ja">🇯🇵 Japanese</option>
+                <option value="ko">🇰🇷 Korean</option>
+                <option value="zh">🇨🇳 Chinese</option>
+                <option value="ar">🇸🇦 Arabic</option>
+                <option value="hi">🇮🇳 Hindi</option>
+            </select>
+        </div>
+        
+        <div class="options">
+            <div class="option">
+                <input type="checkbox" id="voiceClone" checked>
+                <label for="voiceClone">Voice Clone</label>
+            </div>
+        </div>
+        
+        <button type="submit" class="dub-button" id="dubButton">
+            Auto-Dub
+        </button>
+    </form>
+    
+    <div id="error" class="error"></div>
+    
+    <div id="result" class="result">
+        <video id="resultVideo" controls>
+            Your browser does not support the video tag.
+        </video>
+        <a id="downloadLink" class="download-link" download>
+            <svg class="download-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7,10 12,15 17,10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+        </a>
+    </div>
+
+    <script>
+        let currentJobId = null;
+        let pollInterval = null;
+
+        document.getElementById('dubForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const youtubeUrl = document.getElementById('youtubeUrl').value;
+            const language = document.getElementById('language').value;
+            const voiceClone = document.getElementById('voiceClone').checked;
+            
+            // Reset UI
+            hideResults();
+            updateProgress(0, 'Starting...');
+            
+            try {
+                // Create job
+                const response = await fetch('/dub', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                        youtube_url: youtubeUrl,
+                        language: language,
+                        voice_clone: voiceClone,
+                        preserve_background: true  // Always enabled
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+                }
+                
+                const data = await response.json();
+                currentJobId = data.job_id;
+                
+                // Start polling
+                startPolling();
+                
+            } catch (error) {
+                showError(`Failed to start job: ${error.message}`);
+                resetButton();
+            }
+        });
+
+        function startPolling() {
+            if (pollInterval) clearInterval(pollInterval);
+            
+            pollInterval = setInterval(async () => {
+                if (!currentJobId) return;
+                
+                try {
+                    const response = await fetch(`/jobs/${currentJobId}`);
+                    const job = await response.json();
+                    
+                    updateProgress(job.progress || 0, job.current_step || 'Processing...');
+                    
+                    if (job.status === 'completed') {
+                        clearInterval(pollInterval);
+                        showResult(job.output_url);
+                        resetButton();
+                    } else if (job.status === 'failed') {
+                        clearInterval(pollInterval);
+                        showError(`Job failed: ${job.error || 'Unknown error'}`);
+                        resetButton();
+                    }
+                    
+                } catch (error) {
+                    console.error('Polling error:', error);
+                }
+            }, 1000); // Poll every second
+        }
+
+        function updateProgress(step, message) {
+            const button = document.getElementById('dubButton');
+            button.disabled = true;
+            
+            // Remove emoji and clean up message
+            const cleanMessage = message.replace(/^[🎬🎯🎵🎭🧬👥🌍🗣️⏰✅❌📥🎙️⏭️]/g, '').trim();
+            button.textContent = `Step ${step}/9: ${cleanMessage}`;
+        }
+
+        function resetButton() {
+            const button = document.getElementById('dubButton');
+            button.disabled = false;
+            button.textContent = 'Auto-Dub';
+        }
+
+        function showResult(outputUrl) {
+            const resultDiv = document.getElementById('result');
+            const video = document.getElementById('resultVideo');
+            const downloadLink = document.getElementById('downloadLink');
+            
+            video.src = outputUrl;
+            downloadLink.href = outputUrl;
+            resultDiv.style.display = 'block';
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        function hideResults() {
+            document.getElementById('result').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
