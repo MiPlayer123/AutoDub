@@ -85,22 +85,23 @@ def enhanced_autodub_pipeline_with_progress(
             
             update_progress(5, "Assigning unique voices...")
             voice_assignments = assign_unique_voices(speaker_profiles)
-            
-            # Override with cloned voices
-            for speaker_id, cloned_voice_id in cloned_voices.items():
-                if cloned_voice_id is not None:
-                    voice_assignments[speaker_id] = cloned_voice_id
-            
-            validate_voice_assignments(voice_assignments)
         else:
             update_progress(5, "Using default voice assignment...")
             from .config import DEFAULT_VOICE_ID
             voice_assignments = {}
             for speaker in unique_speakers:
-                if speaker in cloned_voices and cloned_voices[speaker] is not None:
-                    voice_assignments[speaker] = cloned_voices[speaker]
-                else:
-                    voice_assignments[speaker] = DEFAULT_VOICE_ID
+                voice_assignments[speaker] = DEFAULT_VOICE_ID
+        
+        # ALWAYS override with cloned voices if available (regardless of diverse_voices setting)
+        if cloned_voices:
+            print(f"Overriding voice assignments with {len(cloned_voices)} cloned voices...")
+            for speaker_id, cloned_voice_id in cloned_voices.items():
+                if cloned_voice_id is not None:
+                    voice_assignments[speaker_id] = cloned_voice_id
+                    print(f"  Speaker {speaker_id} -> Using cloned voice ({cloned_voice_id[:12]}...)")
+        
+        # Always validate final assignments
+        validate_voice_assignments(voice_assignments)
         
         # Translation
         lang_name, lang_code = LANGUAGE_MAP.get(target_language, (target_language, target_language))
