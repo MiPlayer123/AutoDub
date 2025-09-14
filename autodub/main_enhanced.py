@@ -9,6 +9,7 @@ from .pipeline.separate import separate_audio
 from .pipeline.transcribe import transcribe_audio
 from .pipeline.speaker_profile import build_speaker_profiles
 from .pipeline.voice_mapper import assign_unique_voices
+from .pipeline.voice_clone import clone_speaker_voices, cleanup_cloned_voices
 from .pipeline.translate import translate_segments
 from .pipeline.synthesize_enhanced import synthesize_segments_enhanced, validate_voice_assignments
 from .pipeline.align_simple import align_segments_simple
@@ -35,7 +36,8 @@ def enhanced_autodub_pipeline(
     target_language: str = 'es',
     output_name: Optional[str] = None,
     preserve_background: bool = True,
-    diverse_voices: bool = True
+    diverse_voices: bool = True,
+    voice_clone: bool = False
 ) -> Path:
     """
     Enhanced AutoDub pipeline with multi-speaker voice assignment and background preservation.
@@ -52,6 +54,7 @@ def enhanced_autodub_pipeline(
     print(f"🎯 Target: {LANGUAGE_MAP.get(target_language, (target_language, target_language))[0]}")
     print(f"🎵 Background: {'Preserved' if preserve_background else 'Not preserved'}")
     print(f"🎭 Voice diversity: {'Enabled' if diverse_voices else 'Disabled'}")
+    print(f"🧬 Voice cloning: {'Enabled' if voice_clone else 'Disabled'}")
     print(f"{'='*70}\n")
     
     try:
@@ -79,29 +82,54 @@ def enhanced_autodub_pipeline(
         unique_speakers = set(segment['speaker'] for segment in segments)
         print(f"🗣️ Detected {len(unique_speakers)} unique speaker(s): {sorted(unique_speakers)}")
         
-        # Step 4: Speaker analysis (if diverse voices enabled)
+        # Step 4: Voice cloning (if enabled)
+        cloned_voices = {}
+        if voice_clone:
+            print(f"\n🧬 [Step 4/9] Voice cloning...")
+            cloned_voices = clone_speaker_voices(segments, audio_path, use_cloning=True)
+        
+        # Step 5: Speaker analysis and voice assignment
         if diverse_voices and len(unique_speakers) > 1:
-            print(f"\n👥 [Step 4/9] Building speaker profiles...")
+            print(f"\n👥 [Step 5/9] Building speaker profiles...")
             speaker_profiles = build_speaker_profiles(segments, vocals_path if preserve_background else audio_path)
             
-            print(f"\n🎭 [Step 5/9] Assigning unique voices...")
+            print(f"\n🎭 [Step 6/9] Assigning unique voices...")
             voice_assignments = assign_unique_voices(speaker_profiles)
+            
+            # Override with cloned voices where available
+            for speaker_id, cloned_voice_id in cloned_voices.items():
+                if cloned_voice_id is not None:
+                    voice_assignments[speaker_id] = cloned_voice_id
+                    print(f"  Speaker {speaker_id} -> Using cloned voice ({cloned_voice_id[:12]}...)")
+            
             validate_voice_assignments(voice_assignments)
         else:
-            print(f"\n⏭️ [Step 4/9] Skipping speaker profiling (single speaker or diversity disabled)...")
-            print(f"⏭️ [Step 5/9] Using default voice assignment...")
+            if not voice_clone:
+                print(f"\n⏭️ [Step 4/9] Skipping voice cloning...")
+                print(f"⏭️ [Step 5/9] Skipping speaker profiling...")
+                print(f"⏭️ [Step 6/9] Using default voice assignment...")
+            else:
+                print(f"\n⏭️ [Step 5/9] Skipping speaker profiling (single speaker or diversity disabled)...")
+                print(f"⏭️ [Step 6/9] Using default/cloned voice assignment...")
+                
             speaker_profiles = {}
-            # Use default male voice for all speakers
+            # Use cloned voices if available, otherwise default
             from .config import DEFAULT_VOICE_ID
-            voice_assignments = {speaker: DEFAULT_VOICE_ID for speaker in unique_speakers}
+            voice_assignments = {}
+            for speaker in unique_speakers:
+                if speaker in cloned_voices and cloned_voices[speaker] is not None:
+                    voice_assignments[speaker] = cloned_voices[speaker]
+                    print(f"  Speaker {speaker} -> Using cloned voice ({cloned_voices[speaker][:12]}...)")
+                else:
+                    voice_assignments[speaker] = DEFAULT_VOICE_ID
         
-        # Step 6: Translation
+        # Step 7: Translation
         lang_name, lang_code = LANGUAGE_MAP.get(target_language, (target_language, target_language))
-        print(f"\n🌍 [Step 6/9] Translating {len(segments)} segments to {lang_name}...")
+        print(f"\n🌍 [Step 7/9] Translating {len(segments)} segments to {lang_name}...")
         segments = translate_segments(segments, lang_name)
         
-        # Step 7: Enhanced synthesis
-        print(f"\n🗣️ [Step 7/9] Multi-speaker synthesis...")
+        # Step 8: Enhanced synthesis
+        print(f"\n🗣️ [Step 8/9] Multi-speaker synthesis...")
         segments = synthesize_segments_enhanced(
             segments, 
             voice_assignments, 
@@ -109,19 +137,22 @@ def enhanced_autodub_pipeline(
             speaker_profiles
         )
         
-        # Step 8: Simple Alignment
-        print("\n⏰ [Step 8/9] Aligning audio segments...")
+        # Step 9: Alignment, mixing and final video
+        print("\n⏰ [Step 9a/9] Aligning audio segments...")
         dubbed_audio_path = align_segments_simple(segments)
         
-        # Step 9: Final mixing and video creation
         if preserve_background and background_path:
-            print("\n🎵 [Step 9a/9] Mixing with preserved background...")
+            print("🎵 [Step 9b/9] Mixing with preserved background...")
             final_audio_path = mix_audio_simple(dubbed_audio_path, background_path)
         else:
             final_audio_path = dubbed_audio_path
         
-        print("\n🎬 [Step 9b/9] Creating final dubbed video...")
+        print("🎬 [Step 9c/9] Creating final dubbed video...")
         output_path = mux_video(video_path, final_audio_path, output_name or "enhanced_output")
+        
+        # Cleanup cloned voices
+        if cloned_voices:
+            cleanup_cloned_voices(cloned_voices)
         
         # Success summary
         print(f"\n{'='*70}")
@@ -196,6 +227,12 @@ Supported languages:
         dest='diverse_voices',
         help='Use same voice for all speakers'
     )
+    parser.add_argument(
+        '--voice-clone',
+        action='store_true',
+        default=False,
+        help='Enable voice cloning using ElevenLabs (requires Pro plan)'
+    )
     
     args = parser.parse_args()
     
@@ -205,7 +242,8 @@ Supported languages:
             args.lang, 
             args.output,
             args.preserve_background,
-            args.diverse_voices
+            args.diverse_voices,
+            args.voice_clone
         )
     except KeyboardInterrupt:
         print("\n\nInterrupted by user", file=sys.stderr)

@@ -65,8 +65,8 @@ def align_segments_simple(segments: List[Dict]) -> Path:
                     
                     placed_count += 1
                     
-                elif speed_needed <= 2.0:  # Moderate speedup needed (increased threshold)
-                    # Apply more aggressive speed adjustment
+                else:  # Any amount of speedup needed - NO LIMITS!
+                    # Apply speed adjustment with no cap as requested
                     atempo_factor = speed_needed  # FIXED: atempo > 1.0 speeds up
                     
                     temp_path = TEMP_DIR / f"adjusted_{i:04d}.wav"
@@ -79,13 +79,6 @@ def align_segments_simple(segments: List[Dict]) -> Path:
                     
                     print(f"  Segment {i}: Compressed {speed_needed:.1f}x to fit")
                     temp_path.unlink()
-                    
-                else:  # Too much speedup needed
-                    # Truncate to fit
-                    truncated_audio = audio[:target_duration_ms]
-                    combined = combined.overlay(truncated_audio, position=start_ms)
-                    placed_count += 1
-                    print(f"  Segment {i}: Truncated (was {speed_needed:.1f}x too long)")
                 
         except Exception as e:
             print(f"  Failed to place segment {i}: {e}")
@@ -103,33 +96,39 @@ def align_segments_simple(segments: List[Dict]) -> Path:
 
 def adjust_audio_simple(input_path: Path, output_path: Path, atempo_factor: float):
     """
-    Adjust audio speed using ffmpeg atempo filter.
+    Adjust audio speed using ffmpeg atempo filter with NO SPEED LIMITS.
     atempo_factor: > 1.0 speeds up (shortens), < 1.0 slows down (lengthens)
+    Chains multiple atempo filters to achieve any speed.
     """
-    # Clamp to ffmpeg atempo limits
-    atempo_factor = max(0.5, min(2.0, atempo_factor))
-    
-    # If factor is outside single atempo range, chain filters
-    if atempo_factor < 0.5:
-        # Need double speedup
-        cmd = [
-            'ffmpeg', '-i', str(input_path),
-            '-filter:a', 'atempo=0.5,atempo=0.8',
-            '-y', str(output_path)
-        ]
-    elif atempo_factor > 2.0:
-        # Need double slowdown  
-        cmd = [
-            'ffmpeg', '-i', str(input_path),
-            '-filter:a', 'atempo=2.0,atempo=1.5',
-            '-y', str(output_path)
-        ]
+    # Build atempo chain for any speed - NO LIMITS!
+    if atempo_factor <= 0.5:
+        # Very slow - chain multiple atempo filters
+        filters = []
+        remaining = atempo_factor
+        while remaining < 0.5:
+            filters.append("atempo=0.5")
+            remaining *= 2
+        if remaining < 1.0:
+            filters.append(f"atempo={remaining}")
+        filter_chain = ','.join(filters)
+    elif atempo_factor >= 2.0:
+        # Fast speedup - chain multiple atempo filters  
+        filters = []
+        remaining = atempo_factor
+        while remaining > 2.0:
+            filters.append("atempo=2.0")
+            remaining /= 2.0
+        if remaining > 1.0:
+            filters.append(f"atempo={remaining}")
+        filter_chain = ','.join(filters)
     else:
-        # Single atempo is enough
-        cmd = [
-            'ffmpeg', '-i', str(input_path),
-            '-filter:a', f'atempo={atempo_factor}',
-            '-y', str(output_path)
-        ]
+        # Single atempo is enough (0.5 <= factor <= 2.0)
+        filter_chain = f'atempo={atempo_factor}'
+    
+    cmd = [
+        'ffmpeg', '-i', str(input_path),
+        '-filter:a', filter_chain,
+        '-y', str(output_path)
+    ]
     
     subprocess.run(cmd, capture_output=True, check=True)
