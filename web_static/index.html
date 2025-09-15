@@ -116,21 +116,26 @@
         }
         
         .download-link {
-            display: inline-flex;
+            display: flex; /* Ensure flex container for centering */
             align-items: center;
             justify-content: center;
             margin-top: 16px;
-            width: 40px;
-            height: 40px;
-            background: #3066be;
-            color: white;
+            /* Remove fixed width/height to let content dictate size */
+            width: auto;
+            height: auto;
+            padding: 8px; /* Add some padding around the icon */
+            background: none; /* No background color */
+            color: #3066be; /* Change icon color to match primary blue */
             text-decoration: none;
-            border-radius: 50%;
-            transition: background-color 0.2s;
+            border: 2px solid #3066be; /* Add a border to define the button area */
+            border-radius: 8px; /* Slightly rounded corners */
+            transition: all 0.2s;
         }
         
         .download-link:hover {
-            background: #090c9b;
+            background: #e6f0ff; /* Light background on hover */
+            color: #090c9b;
+            border-color: #090c9b;
         }
         
         .download-icon {
@@ -199,13 +204,13 @@
         <video id="resultVideo" controls>
             Your browser does not support the video tag.
         </video>
-        <a id="downloadLink" class="download-link" download>
+        <!-- <a id="downloadLink" class="download-link" download>
             <svg class="download-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                 <polyline points="7,10 12,15 17,10"/>
                 <line x1="12" y1="15" x2="12" y2="3"/>
             </svg>
-        </a>
+        </a> -->
     </div>
 
     <script>
