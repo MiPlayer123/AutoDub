@@ -1,6 +1,6 @@
 # AutoDub - Automatic Video Dubbing Pipeline
 
-Automatically dub YouTube videos into different languages using AI-powered transcription, translation, and speech synthesis.
+Automatically dub YouTube videos into different languages using AI-powered transcription, translation, and speech synthesis. This project also includes a web interface for easy use.
 
 ## Features
 
@@ -10,6 +10,12 @@ Automatically dub YouTube videos into different languages using AI-powered trans
 - **Speech Synthesis**: Generate natural-sounding speech using ElevenLabs
 - **Audio Alignment**: Synchronize dubbed audio with original video timing
 - **Multi-Speaker Support**: Different voices for different speakers
+- **Web Interface**: A simple web UI for submitting dubbing jobs and tracking progress.
+- **Real-time Progress**: Step-by-step updates via polling in the web UI.
+- **Background Processing**: Non-blocking job execution for web requests.
+- **Error Handling**: Clear error messages in the web UI.
+- **Voice Cloning**: Default enabled for best quality dubbing (via web UI).
+- **Background Preservation**: Keeps original background music/effects (via web UI).
 
 ## Installation
 
@@ -52,19 +58,24 @@ python -m autodub.main https://youtube.com/watch?v=VIDEO_ID --lang fr
 python -m autodub.main https://youtube.com/watch?v=VIDEO_ID --lang de --output my_video
 ```
 
-### Supported Languages
+### Web Interface
 
-- `es` - Spanish
-- `fr` - French
-- `de` - German
-- `it` - Italian
-- `pt` - Portuguese
-- `ru` - Russian
-- `ja` - Japanese
-- `ko` - Korean
-- `zh` - Chinese
-- `ar` - Arabic
-- `hi` - Hindi
+1. **Start the server:**
+   ```bash
+   python web_server.py
+   ```
+
+2. **Open your browser:**
+   - **Web Interface:** http://localhost:8000/
+   - **API Docs:** http://localhost:8000/docs
+
+3. **Use the interface:**
+   - Paste YouTube URL
+   - Select language 
+   - Choose options (Voice Clone, Background Preservation)
+   - Click "Auto-Dub" 
+   - Watch progress in real-time
+   - Download result when complete
 
 ### Python API
 
@@ -77,6 +88,20 @@ output_path = autodub_pipeline(
     output_name="my_dubbed_video"
 )
 ```
+
+## Supported Languages
+
+- `es` - Spanish
+- `fr` - French
+- `de` - German
+- `it` - Italian
+- `pt` - Portuguese
+- `ru` - Russian
+- `ja` - Japanese
+- `ko` - Korean
+- `zh` - Chinese
+- `ar` - Arabic
+- `hi` - Hindi
 
 ## Pipeline Architecture
 
@@ -99,7 +124,12 @@ autodub/
 │   ├── align.py         # Audio timing alignment
 │   └── mux.py          # Video/audio muxing
 ├── main.py             # CLI entry point
+├── web_pipeline.py     # Progress-tracked pipeline for web
 └── config.py           # Configuration & API keys
+web_server.py           # FastAPI server
+web_static/
+└── index.html         # Minimal frontend
+outputs/                # Generated videos
 ```
 
 ## Output
@@ -117,12 +147,12 @@ python test_pipeline.py
 
 ## Future Enhancements
 
-- [ ] Source separation to preserve background music
-- [ ] Voice cloning for original speaker voices
-- [ ] FastAPI server for web interface
-- [ ] Real-time progress tracking
-- [ ] Batch processing support
-- [ ] Quality adjustment settings
+- Job history and management for the web interface
+- Batch processing for CLI and web
+- Advanced UI improvements
+- External API integrations
+- Performance optimizations
+- Quality adjustment settings
 
 ## Requirements
 
