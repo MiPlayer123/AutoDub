@@ -269,11 +269,17 @@
                     const response = await fetch(`/jobs/${currentJobId}`);
                     const job = await response.json();
                     
+                    console.log('Job status:', job);
                     updateProgress(job.progress || 0, job.current_step || 'Processing...');
                     
                     if (job.status === 'completed') {
                         clearInterval(pollInterval);
-                        showResult(job.output_url);
+                        console.log('Job completed! Output URL:', job.output_url);
+                        if (job.output_url) {
+                            showResult(job.output_url);
+                        } else {
+                            showError('Job completed but no output URL was provided');
+                        }
                         resetButton();
                     } else if (job.status === 'failed') {
                         clearInterval(pollInterval);
@@ -303,13 +309,25 @@
         }
 
         function showResult(outputUrl) {
+            console.log('Setting video source to:', outputUrl);
             const resultDiv = document.getElementById('result');
             const video = document.getElementById('resultVideo');
-            const downloadLink = document.getElementById('downloadLink');
             
             video.src = outputUrl;
-            downloadLink.href = outputUrl;
             resultDiv.style.display = 'block';
+            
+            // Force reload the video to ensure it plays
+            video.load();
+            
+            // Add error handling for video loading
+            video.addEventListener('error', (e) => {
+                console.error('Video loading error:', e);
+                showError(`Failed to load video from ${outputUrl}. Check browser console for details.`);
+            });
+            
+            video.addEventListener('loadeddata', () => {
+                console.log('Video loaded successfully');
+            });
         }
 
         function showError(message) {
